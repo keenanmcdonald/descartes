@@ -1,14 +1,6 @@
 g = grid.connect()
 
-local quantOctave = 1
-local quant = {true, false, true, false, true, true, false, true, false, true, false, true}
-local quantScale = {0, 2, 4, 5, 7, 9, 11, 12}
-local noteNames = {'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'}
-local metRunning = false
-local stepBase = 1
-local step = 1
-local editNote = 0
-local snakePatterns = {
+local SNAKE_PATTERNS = {
   {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16},
   {1,2,3,4,8,7,6,5,9,10,11,12,16,15,14,13},
   {4,8,12,16,3,7,11,15,2,6,10,14,1,5,9,13},
@@ -26,8 +18,20 @@ local snakePatterns = {
   {13,14,15,16,11,3,4,12,9,1,2,10,5,6,7,8},
   {9,13,12,16,3,7,2,6,11,15,10,14,1,5,4,8},
 }
-local slewTime = 0.04
-local snake = 1
+local NOTE_NAMES = {'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'}
+local SLEW_TIME = 0.04
+local editNote = 0
+
+local quantOctave = {1, 1, 1}
+local quantScale = {
+  {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+  {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+  {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+}
+local stepBase = {1, 1}
+local step = {1, 1, 1}
+local snake = {1, 1}
+local displayLayer = 1
 
 function initTable(size, value)
   t = {}
@@ -39,61 +43,100 @@ end
 
 function init()
   params:add{type = "option", id = "clockSrc", name = "clock source", options = {"internal", "crow"}, default=1}
-  access = initTable(16, true)
-  noteValue = initTable(16, 0)
-  quantizedNotes = initTable(16, 0)
-  gate = initTable(16, true)
-  glide = initTable(16, false)
-  crow.input[1].change = advance
-  crow.input[1].mode("change", 2.0, .25, "rising")
+  
+  quant = {
+    initTable(12, true),
+    initTable(12, true),
+    initTable(12, true),
+  }
+  access = {
+    initTable(16, true),
+    initTable(16, true),
+    initTable(16, true),
+  }
+  noteValue = {
+    initTable(16, 0),
+    initTable(16, 0),
+    initTable(16, 0),
+  }
+  quantizedNotes = {
+    initTable(16, 0),
+    initTable(16, 0),
+    initTable(16, 0),
+  }
+  gate = {
+    initTable(16, true),
+    initTable(16, true),
+    initTable(16, true),
+  }
+  glide = {
+    initTable(16, false),
+    initTable(16, false),
+    initTable(16, false),
+  }
+  
+  crow.input[1].change = function(rising)
+    advance(1, rising)
+  end
+  crow.input[1].mode("change", 2.0, .25, "both")
+  crow.input[2].change = function(rising)
+    advance(2, rising)
+  end
+  crow.input[2].mode("change", 2.0, .25, "both")
+
   redraw()
 end
 
-function advance()
-  stepBase = (stepBase) % 16 + 1
-  step = snakePatterns[snake][stepBase]
-  while (not access[step]) do
-    step = (step) % 16 + 1
-  end
-  --glide
-  if (glide[step]) then
-    crow.output[1].slew = slewTime
+function advance(l, rising)
+  gateOut = l*2
+
+  if rising then
+    out = ((l-1)*2)+1
+    stepBase[l] = (stepBase[l]) % 16 + 1
+    step[l] = SNAKE_PATTERNS[snake[l]][stepBase[l]]
+    while (not access[l][step[l]]) do
+      stepBase[l] = (stepBase[l]) % 16 + 1
+      step[l] = SNAKE_PATTERNS[snake[l]][stepBase[l]]
+    end
+    
+    --glide
+    if (glide[l][step[l]]) then
+      crow.output[out].slew = SLEW_TIME
+    else
+      crow.output[out].slew = 0
+    end
+  
+    --note
+    crow.output[((l-1)*2)+1].volts=(quantizedNotes[l][step[l]]/12)
+    
+    -- gate
+    if (gate[l][step[l]]) then
+      crow.output[gateOut].volts = 5
+    end
   else
-    crow.output[1].slew = 0
+    crow.output[gateOut].volts = 0
   end
-  --note
-  crow.output[1].volts=(quantizedNotes[step]/12)
-  --gate
-  if (gate[step]) then
-    norns.crow.events = {}
-    crow.input[1].change = endGate
-    crow.input[1].mode("change", 2.0, .25, "falling")
-    crow.output[2].volts = 5
-  end
-  redraw()
-end
 
-function endGate()
-  norns.crow.events = {}
-  crow.output[2].volts = 0
-  crow.input[1].change = advance
-  crow.input[1].mode("change", 2.0, .25, "rising")
+  redraw()
 end
 
 function redraw()
   screen.clear()
+  l = displayLayer
+  
   if (editNote >= 1) then
     screen.font_face(3)
     screen.font_size(20)
     screen.move(30, 20)
     screen.text(editNote)
     screen.text(': ')
-    screen.text(noteNames[(quantizedNotes[editNote] % 12) + 1])
-    screen.text(math.floor(quantizedNotes[editNote] / 12) + 1)
+    screen.text(NOTE_NAMES[(quantizedNotes[l][editNote] % 12) + 1])
+    screen.text(math.floor(quantizedNotes[l][editNote] / 12) + 1)
   else
     screen.font_face(1)
     screen.font_size(8)
     screen.level(15)
+    
     --step
     screen.rect(1,1,32,32)
     screen.move(2,6)
@@ -108,13 +151,13 @@ function redraw()
     screen.rect(64,1,32,32)
     screen.move(66,6)
     screen.text('active')
-    
+
     -- gate
     screen.rect(96,1,32,32)
     screen.move(98,6)
     screen.text('gate')
     
-    --quant
+    -- quant
     screen.rect(1,32,32,32)
     screen.move(2,38)
     screen.text('quant')
@@ -138,19 +181,23 @@ function redraw()
 end
 
 function grid_redraw()
+  l = displayLayer
+
   g:all(0)
+  
   --active step
-  x, y = toGrid(step)
+  x, y = toGrid(step[l])
   g:led(x, y, 15)
+  
   -- notes
   for i=1,16 do
     x, y = toGrid(i, 4)
-    g:led(x, y, math.floor((quantizedNotes[i]/quantScale[#quantScale])*15))
+    g:led(x, y, math.floor((quantizedNotes[l][i]/quantScale[l][#quantScale[l]])*15))
   end
   
   --access
   for i=1,16 do
-    if (access[i]) then
+    if (access[l][i]) then
       brightness = 15
     else
       brightness = 0
@@ -161,7 +208,7 @@ function grid_redraw()
   
   -- gate
   for i=1,16 do
-    if (gate[i]) then
+    if (gate[l][i]) then
       brightness = 15
     else
       brightness = 0
@@ -171,9 +218,9 @@ function grid_redraw()
   end
   
   -- quant
-  g:led(quantOctave, 5, 15)
-  for i=1,#quant do
-    if (quant[i]) then
+  g:led(quantOctave[l], 5, 15)
+  for i=1,#quant[l] do
+    if (quant[l][i]) then
       brightness = 15
     else
       brightness = 0
@@ -184,7 +231,7 @@ function grid_redraw()
   
   --glide
   for i=1,16 do
-    if (glide[i]) then
+    if (glide[l][i]) then
       brightness = 15
     else
       brightness = 0
@@ -194,7 +241,7 @@ function grid_redraw()
   end
   
   --snake
-  x,y = toGrid(snake, 8,4)
+  x,y = toGrid(snake[l], 8,4)
   g:led(x,y,15)
 
   g:refresh()
@@ -236,86 +283,78 @@ function getZone(x, y)
   end
 end
 
-function updateQuantScale()
-  quantScale = {}
-  for i=1,quantOctave do
-    for j=1,#quant do
-      if (quant[j]) then
-        table.insert(quantScale, (i-1)*12 + j-1)
+function updateQuantScale(l)
+  quantScale[l] = {}
+  for i=1,quantOctave[l] do
+    for j=1,#quant[l] do
+      if (quant[l][j]) then
+        table.insert(quantScale[l], (i-1)*12 + j-1)
       end
     end
-    if (i == quantOctave and quant[1]) then
-      table.insert(quantScale, 12*i)
+    if (i == quantOctave[l] and quant[l][1]) then
+      table.insert(quantScale[l], 12*i)
     end
   end
-  updateQuantizedNotes()
+  updateQuantizedNotes(l)
 end
 
-function updateQuantizedNotes()
-  quantizedNotes = {}
-  for i=1,#noteValue do
-    table.insert(quantizedNotes, quantizeValue(noteValue[i]))
+function updateQuantizedNotes(l)
+  quantizedNotes[l] = {}
+  for i=1,#noteValue[l] do
+    table.insert(quantizedNotes[l], quantizeValue(noteValue[l][i]))
   end
 end
 
 function quantizeValue(value)
-  unquantizedValue = quantScale[#quantScale] * (value / 100)
-  print(unquantizedValue)
+  unQuantizedValue = quantScale[l][#quantScale[l]] * (value / 100)
   leastDiff = 100
   closestNote = nil
-  --TODO: what if there are no notes in the quantizer?
-  for j=1,#quantScale do
-    diff = math.abs(quantScale[j] - unquantizedValue)
+  --TODO: what if there are no notes in the xQuantizer?
+  for j=1,#quantScale[l] do
+    diff = math.abs(quantScale[l][j] - unQuantizedValue)
     if (diff < leastDiff) then
       leastDiff = diff
-      closestNote = quantScale[j]
+      closestNote = quantScale[l][j]
     end
   end
   return closestNote
 end
 
 function key(n,z)
-  -- print("key: ", n,z)
-  -- if (n == 2 and z == 1) then
-  --   if (metRunning == false) then 
-  --     met:start()
-  --     metRunning = true
-  --   else
-  --     met:stop()
-  --     metRunning = false
-  --   end
-  -- end
-  -- redraw()
+  if n == 2 and z == 1 then
+    displayLayer = displayLayer % 2 + 1
+  end
+  redraw()
 end
 
 function enc(n, d)
+  l = displayLayer
   if (editNote >= 1) then
-    noteValue[editNote] = util.clamp(noteValue[editNote]+d*2, 0, 100)
+    noteValue[l][editNote] = util.clamp(noteValue[l][editNote]+d*2, 0, 100)
   end
-  updateQuantizedNotes()
+  updateQuantizedNotes(l)
   redraw()
 end
 
 function g.key(x,y,z)
+  l = displayLayer
   if (z==1) then
     if (getZone(x,y) == 'note') then
       editNote = toStep(x,y)
     elseif (getZone(x,y) == 'access') then
-      access[toStep(x,y)] = not access[toStep(x,y)]
+      access[l][toStep(x,y)] = not access[l][toStep(x,y)]
     elseif(getZone(x,y) == 'gate') then
-      gate[toStep(x,y)] = not gate[toStep(x,y)]
+      gate[l][toStep(x,y)] = not gate[l][toStep(x,y)]
     elseif(getZone(x,y) == 'quantOctave') then
-      quantOctave = x
-      updateQuantScale()
+      quantOctave[l] = x
+      updateQuantScale(l)
     elseif(getZone(x,y) == 'quant') then
-      quant[toStep(x,y)] = not quant[toStep(x,y)]
-      updateQuantScale()
+      quant[l][toStep(x,y)] = not quant[l][toStep(x,y)]
+      updateQuantScale(l)
     elseif(getZone(x,y) == 'glide') then
-      print('glide', x, y)
-      glide[toStep(x,y)] = not glide[toStep(x,y)]
-      printTable(glide)
+      glide[l][toStep(x,y)] = not glide[l][toStep(x,y)]
     elseif(getZone(x,y) == 'snake') then
-      snake = toStep(x,y)
+      snake[l] = toStep(x,y)
     end
   else
     editNote = 0
@@ -324,7 +363,7 @@ function g.key(x,y,z)
 end
 
 function printTable(t)
-  print('table: ')
+  print('print table called', t['change'])
   for i=1,#t do
     print(i, t[i])
   end
