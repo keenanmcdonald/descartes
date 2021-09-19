@@ -1,3 +1,11 @@
+-- 
+-- Descartes v0.1
+-- an implementation of Make Noise Rene v2 for norns, grid, and crow
+-- K2/3 Cycle through layers
+-- crow inputs 1 and 2 accept gates for x and y layers respectively
+-- crow outputs are assignable via edit menu
+-- norns display indicates how 4x4 grids are mapped to various functions 
+
 g = grid.connect()
 
 local SNAKE_PATTERNS = {
@@ -81,6 +89,8 @@ function init()
     initTable(16, false),
     initTable(16, false),
   }
+  
+  loadData()
   
   crow.input[1].change = function(rising)
     advance(1, rising)
@@ -468,9 +478,18 @@ function quantizeValue(value)
 end
 
 function key(n,z)
-  if n == 2 and z == 1 then
+  if n == 3 and z == 1 then
     displayLayer = displayLayer % 3 + 1
+  elseif n == 2 and z == 1 then
+    print(math.abs(displayLayer - 1) % 3)
+    
+    if (displayLayer-1 == 0) then
+      displayLayer = 3
+    else
+      displayLayer = displayLayer-1
+    end
   end
+  saveData()
   grid_redraw()
   redraw()
 end
@@ -508,8 +527,38 @@ function g.key(x,y,z)
   else
     editNote = 0
   end
+  saveData()
   grid_redraw()
   redraw()
+end
+
+function saveData()
+  saveState = {}
+  saveState['quantOctave'] = quantOctave
+  saveState['quantScale'] =  quantScale
+  saveState['quantizedNotes'] = quantizedNotes
+  saveState['snake'] = snake
+  saveState['quant'] = quant
+  saveState['access']  = access
+  saveState['noteValue'] = noteValue
+  saveState['gate'] = gate
+  saveState['glide'] = glide
+  tab.save(saveState, _path.data.."descartes_save_state.txt")
+end
+
+function loadData()
+  saveState = tab.load(_path.data.."descartes_save_state.txt")
+  quantOctave = saveState['quantOctave']
+  quantScale = saveState['quantScale']
+  quantizedNotes = saveState['quantizedNotes']
+  snake = saveState['snake']
+  quant =  saveState['quant']
+  access = saveState['access']
+  noteValue = saveState['noteValue']
+  gate = saveState['gate']
+  glide = saveState['glide']
+  redraw()
+  grid_redraw()
 end
 
 function printTable(t)
