@@ -1,8 +1,6 @@
 # Descartes
 Cartesian sequencer for norns, grid and crow. 
 
-This is an implementation of Make Noise Rene v2 sequencer for norns, crow and grid. The script is intended to operate identical to Rene where possible - therefore I'm not going to write complete instructions about the operation of the script - but much can be gleaned by reading through the [Rene v2 manual](https://www.makenoisemusic.com/content/manuals/renemanual.pdf).
-
 ## Requirements
 - norns
 - grid
