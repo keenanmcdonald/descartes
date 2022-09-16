@@ -1,4 +1,4 @@
-# Descartes
+# descartes
 Cartesian sequencer for norns, grid and crow. 
 
 ## Requirements
