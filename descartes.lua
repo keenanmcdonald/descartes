@@ -1,5 +1,5 @@
 -- 
--- Descartes v0.1
+-- Descartes v1.1.0
 -- an implementation of Make Noise Rene v2 for norns, grid, and crow
 -- K2/3 Cycle through layers
 -- crow inputs 1 and 2 accept gates for x and y layers respectively
@@ -43,6 +43,9 @@ local snake = {1, 1}
 local displayLayer = 1
 local cGateOpen = {false, false}
 
+local midiVelParam = {"midiVelX", "midiVelY"}
+local midiChanParam = {"midiChanX", "midiChanY"}
+
 function initTable(size, value)
   t = {}
   for i=1,size do
@@ -52,12 +55,22 @@ function initTable(size, value)
 end
 
 function init()
+  params:add{type = "option", id = "xClock", name = "x clock", options = {"crow input 1", "crow input 2", "internal clock"}, default = 1}
+  params:add{type = "option", id = "yClock", name = "y clock", options = {"crow input 1", "crow input 2", "internal clock"}, default = 2}
   params:add{type = "option", id = "xStep", name = "x step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=1}
   params:add{type = "option", id = "xGate", name = "x gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=2}
   params:add{type = "option", id = "yStep", name = "y step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=3}
   params:add{type = "option", id = "yGate", name = "y gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=4}
   params:add{type = "option", id = "cStep", name = "c step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=5}
   params:add{type = "option", id = "cGate", name = "c gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=5}
+  params:add{type = "number", id = "midiChanX", name = "midi channel x", min = 1, max = 16, default = 1}
+  params:add{type = "number", id = "midiChanY", name = "midi channel y", min = 1, max = 16, default = 2}
+  params:add{type = "number", id = "midiChanC", name = "midi channel c", min = 1, max = 16, default = 3}
+  params:add{type = "number", id = "midiVelX", name = "midi velocity x", min = 1, max = 127, default = 100}
+  params:add{type = "number", id = "midiVelY", name = "midi velocity y", min = 1, max = 127, default = 100}
+  params:add{type = "number", id = "midiVelC", name = "midi velocity c", min = 1, max = 127, default = 100}
+  
+  clock.run(stepClock)
   
   quant = {
     initTable(12, true),
@@ -92,6 +105,8 @@ function init()
   
   loadData()
   
+  midi_out = midi.connect(1)
+  
   crow.input[1].change = function(rising)
     advance(1, rising)
   end
@@ -103,6 +118,25 @@ function init()
   
   grid_redraw()
   redraw()
+end
+
+function stepClock()
+  while true do
+    if (params:get("xClock") == 3) then
+      advance(1, true)
+    end
+    if (params:get("yClock") == 3) then
+      advance(2, true)
+    end
+    clock.sync(1/2)
+    if (params:get("xClock") == 3) then
+      advance(1, false)
+    end
+    if (params:get("yClock") == 3) then 
+      advance(2, false)
+    end
+    clock.sync(1/2)
+  end
 end
 
 function advance(inputNum, rising)
@@ -184,6 +218,8 @@ function advance(inputNum, rising)
         crow.output[gateOut].volts = 5
       end
     end
+    print('on', quantizedNotes[inputNum][step[inputNum]], midiVelParam[inputNum], midiChanParam[inputNum])
+    midi_out:note_on(quantizedNotes[inputNum][step[inputNum]], params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
   else
     if gateOut < 5 then
       crow.output[gateOut].volts = 0
@@ -192,6 +228,8 @@ function advance(inputNum, rising)
       crow.output[params:get("cGate")].volts = 0
       cGateOpen[inputNum] = false
     end
+    print('off', quantizedNotes[inputNum][step[inputNum]], midiVelParam[inputNum], midiChanParam[inputNum])
+    midi_out:note_off(quantizedNotes[inputNum][step[inputNum]], params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
   end
   grid_redraw()
   redraw()
