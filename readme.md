@@ -4,7 +4,6 @@ Cartesian sequencer for norns, grid and crow.
 ## Requirements
 - norns
 - grid
-- crow
 
 ## Documentation
 - Norns' screen indicates which parts of the grid correspond to which parameters of the sequencer.
