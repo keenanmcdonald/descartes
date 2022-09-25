@@ -55,22 +55,33 @@ function initTable(size, value)
 end
 
 function init()
-  params:add{type = "option", id = "xClock", name = "x clock", options = {"crow input 1", "crow input 2", "internal clock"}, default = 1}
-  params:add{type = "option", id = "yClock", name = "y clock", options = {"crow input 1", "crow input 2", "internal clock"}, default = 2}
-  params:add{type = "option", id = "xStep", name = "x step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=1}
-  params:add{type = "option", id = "xGate", name = "x gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=2}
-  params:add{type = "option", id = "yStep", name = "y step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=3}
-  params:add{type = "option", id = "yGate", name = "y gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=4}
-  params:add{type = "option", id = "cStep", name = "c step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=5}
-  params:add{type = "option", id = "cGate", name = "c gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=5}
-  params:add{type = "number", id = "midiChanX", name = "midi channel x", min = 1, max = 16, default = 1}
-  params:add{type = "number", id = "midiChanY", name = "midi channel y", min = 1, max = 16, default = 2}
-  params:add{type = "number", id = "midiChanC", name = "midi channel c", min = 1, max = 16, default = 3}
-  params:add{type = "number", id = "midiVelX", name = "midi velocity x", min = 1, max = 127, default = 100}
-  params:add{type = "number", id = "midiVelY", name = "midi velocity y", min = 1, max = 127, default = 100}
-  params:add{type = "number", id = "midiVelC", name = "midi velocity c", min = 1, max = 127, default = 100}
-  
-  clock.run(stepClock)
+  params:add_group("x layer",8)
+  params:add{type = "option", id = "xClock", name = "clock source", options = {"crow input 1", "crow input 2", "internal clock"}, default = 1}
+  params:add{type = "option", id = "xStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=1}
+  params:add{type = "option", id = "xGate", name = "gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=2}
+  params:add{type = "number", id = "midiChanX", name = "midi channel", min = 1, max = 16, default = 1}
+  params:add{type = "number", id = "midiVelX", name = "midi velocity", min = 1, max = 127, default = 100}
+  params:add_separator("xClockDiv", "internal clock division")
+  params:add{type = "number", id = "xClockNum", name = "numerator", min = 1, max = 8, default = 1}
+  params:add{type = "number", id = "xClockDen", name = "denominator", min=1, max=16, default = 1}
+
+
+  params:add_group("y layer",8)
+  params:add{type = "option", id = "yClock", name = "clock", options = {"crow input 1", "crow input 2", "internal clock"}, default = 2}
+  params:add{type = "option", id = "yStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=3}
+  params:add{type = "option", id = "yGate", name = "gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=4}
+  params:add{type = "number", id = "midiChanY", name = "midi channel", min = 1, max = 16, default = 2}
+  params:add{type = "number", id = "midiVelY", name = "midi velocity", min = 1, max = 127, default = 100}
+  params:add_separator("yClockDiv", "internal clock division")
+  params:add{type = "number", id = "yClockNum", name = "numerator", min = 1, max = 8, default = 1}
+  params:add{type = "number", id = "yClockDen", name = "denominator", min=1, max=16, default = 1}
+
+
+  params:add_group("c layer",4)
+  params:add{type = "option", id = "cStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=5}
+  params:add{type = "option", id = "cGate", name = "gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=5}
+  params:add{type = "number", id = "midiChanC", name = "midi channel", min = 1, max = 16, default = 3}
+  params:add{type = "number", id = "midiVelC", name = "midi velocity", min = 1, max = 127, default = 100}
   
   quant = {
     initTable(12, true),
@@ -103,8 +114,10 @@ function init()
     initTable(16, false),
   }
   
-  loadData()
+  -- make data directory
+  if not util.file_exists(_path.data.."descartes/") then util.make_dir(_path.data.."descartes/") end
   
+  loadData()
   midi_out = midi.connect(1)
   
   crow.input[1].change = function(rising)
@@ -115,29 +128,38 @@ function init()
     advance(2, rising)
   end
   crow.input[2].mode("change", 2.0, .25, "both")
+
+  clock.run(stepXClock)
+  -- clock.run(stepYClock)
   
   grid_redraw()
   redraw()
 end
 
-function stepClock()
+function stepXClock()
+  print(params:get("xClock"), params:get("xClock") == 3)
+  print(params:get("xClockDen")/(params:get("xClockNum")*2))
   while true do
-    if (params:get("xClock") == 3) then
-      advance(1, true)
-    end
-    if (params:get("yClock") == 3) then
-      advance(2, true)
-    end
-    clock.sync(1/2)
-    if (params:get("xClock") == 3) then
-      advance(1, false)
-    end
-    if (params:get("yClock") == 3) then 
-      advance(2, false)
-    end
-    clock.sync(1/2)
+    advance(1, true)
+    clock.sync(params:get("xClockDen")/(params:get("xClockNum")*2))
+    advance(1, false)
+    clock.sync(params:get("xClockDen")/(params:get("xClockNum")*2))
   end
 end
+
+-- function stepYClock()
+--   -- while true do
+--   --   if (params:get("yClock") == 3) then
+--   --     advance(2, true)
+--   --   end
+--   --   clock.sync(params:get("yClockDen")/(params:get("yClockNum")*2))
+--   --   if (params:get("yClock") == 3) then
+--   --     advance(2, false)
+--   --   end
+--   --   clock.sync(params:get("yClockDen")/(params:get("yClockNum")*2))
+--   -- end
+-- end
+
 
 function advance(inputNum, rising)
   l = activeLayer
@@ -154,12 +176,12 @@ function advance(inputNum, rising)
   -- C
   if rising then
     cRow = math.floor(step[3] / 4) -- 0,1,2, or 3
-    cCol = ((step[3]-1) % 4)+1 -- 1,2,3,4
+    cCol = ((step[3]) % 4)+1 -- 1,2,3,4
 
     -- C
     if (inputNum == 1) then
-      -- if there are no accessable steps in the current row
-      if (access[3][(cRow*4)+1] or access[3][(cRow*4)+2] or access[3][(cRow*4)+3] or access[3][(cRow*4)+4]) then
+      -- if there are no accessible steps in the current row
+      if (access[3][(cRow*4 % 16)+1] or access[3][(cRow*4 % 16)+2] or access[3][(cRow*4 % 16)+3] or access[3][(cRow*4 % 16)+4]) then
         step[3] = (step[3] % 4 + 1) + (math.floor((step[3]-1)/4)*4)
         while (not access[3][step[3]]) do
           step[3] = (step[3] % 4 + 1) + (math.floor((step[3]-1)/4)*4)
@@ -191,6 +213,7 @@ function advance(inputNum, rising)
         cGateOpen[inputNum] = true
       end
     end
+    midi_out:note_on(quantizedNotes[3][step[3]], params:get("midiVelC"), params:get("midiChanC"))
     
     -- X and Y
     stepBase[inputNum] = (stepBase[inputNum]) % 16 + 1
@@ -218,7 +241,6 @@ function advance(inputNum, rising)
         crow.output[gateOut].volts = 5
       end
     end
-    print('on', quantizedNotes[inputNum][step[inputNum]], midiVelParam[inputNum], midiChanParam[inputNum])
     midi_out:note_on(quantizedNotes[inputNum][step[inputNum]], params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
   else
     if gateOut < 5 then
@@ -228,7 +250,6 @@ function advance(inputNum, rising)
       crow.output[params:get("cGate")].volts = 0
       cGateOpen[inputNum] = false
     end
-    print('off', quantizedNotes[inputNum][step[inputNum]], midiVelParam[inputNum], midiChanParam[inputNum])
     midi_out:note_off(quantizedNotes[inputNum][step[inputNum]], params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
   end
   grid_redraw()
@@ -519,8 +540,6 @@ function key(n,z)
   if n == 3 and z == 1 then
     displayLayer = displayLayer % 3 + 1
   elseif n == 2 and z == 1 then
-    print(math.abs(displayLayer - 1) % 3)
-    
     if (displayLayer-1 == 0) then
       displayLayer = 3
     else
@@ -581,27 +600,24 @@ function saveData()
   saveState['noteValue'] = noteValue
   saveState['gate'] = gate
   saveState['glide'] = glide
-  tab.save(saveState, _path.data.."descartes_save_state.txt")
+  tab.save(saveState, _path.data.."descartes/".."descartes_state.txt")
+  params:write(_path.data.."descartes/".."descartes_params.pset")
 end
 
 function loadData()
-  saveState = tab.load(_path.data.."descartes_save_state.txt")
-  quantOctave = saveState['quantOctave']
-  quantScale = saveState['quantScale']
-  quantizedNotes = saveState['quantizedNotes']
-  snake = saveState['snake']
-  quant =  saveState['quant']
-  access = saveState['access']
-  noteValue = saveState['noteValue']
-  gate = saveState['gate']
-  glide = saveState['glide']
+  saveState = tab.load(_path.data.."descartes/".."descartes_state.txt")
+  if saveState ~= nil then
+    quantOctave = saveState['quantOctave']
+    quantScale = saveState['quantScale']
+    quantizedNotes = saveState['quantizedNotes']
+    snake = saveState['snake']
+    quant =  saveState['quant']
+    access = saveState['access']
+    noteValue = saveState['noteValue']
+    gate = saveState['gate']
+    glide = saveState['glide']
+  end
+  params:read(_path.data.."descartes/".."descartes_params.pset")
   redraw()
   grid_redraw()
-end
-
-function printTable(t)
-  print('print table called', t['change'])
-  for i=1,#t do
-    print(i, t[i])
-  end
 end
