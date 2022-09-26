@@ -1,10 +1,11 @@
--- 
--- Descartes v1.1.0
+-- Descartes 
+-- v1.1.0 @kjames
+-- llllllll.co/t/descartes/58413
+--
 -- an implementation of Make Noise Rene v2 for norns, grid, and crow
 -- K2/3 Cycle through layers
--- crow inputs 1 and 2 accept gates for x and y layers respectively
--- crow outputs are assignable via edit menu
--- norns display indicates how 4x4 grids are mapped to various functions 
+-- inputs & outputs are assignable via edit menu
+-- press and hold a key on grid and turn E2 to change note
 
 g = grid.connect()
 
