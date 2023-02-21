@@ -1,0 +1,19 @@
+{
+  "file_info": {
+    "version": 1,
+    "kind": "project_metadata"
+  },
+  "installed_on": "2022-11-05T16:53:28.579175249Z",
+  "updated_on": "0001-01-01T00:00:00Z",
+  "project_url": "https://github.com/keenanmcdonald/descartes",
+  "catalog_entry": {
+    "project_name": "descartes",
+    "project_url": "https://github.com/keenanmcdonald/descartes",
+    "author": "Keenan McDonald (kjames)",
+    "description": "a cartesian sequencer for grid",
+    "discussion_url": "https://llllllll.co/t/descartes/58413",
+    "tags": [
+      "sequencer"
+    ]
+  }
+}

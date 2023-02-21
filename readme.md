@@ -19,3 +19,8 @@ Cartesian sequencer for norns, grid and crow.
 - added param groups
 - fixed a bug in which x clocks weren't cycling correctly in the c layer
 - fixed a bug in which the script may not have been loading due to an absence of save data
+
+### v1.1.1
+- fixed a bug in which norns would freeze if a user set turned off all access cells
+- fixed a bug that prevented the y layer from working entirely
+- fixed assignable inputs

@@ -121,45 +121,60 @@ function init()
   loadData()
   midi_out = midi.connect(1)
   
+  clock.run(stepXClock)
+  clock.run(stepYClock)
+  
   crow.input[1].change = function(rising)
-    advance(1, rising)
+    if (params:get("xClock") == 1 ) then
+      advance(1, rising)
+    end
+    if (params:get("yClock") == 1) then
+      advance(2, rising)
+    end
   end
   crow.input[1].mode("change", 2.0, .25, "both")
+
+  
   crow.input[2].change = function(rising)
-    advance(2, rising)
+    if (params:get("xClock") == 2 ) then
+      advance(1, rising)
+    end
+    if (params:get("yClock") == 2) then
+      advance(2, rising)
+    end
   end
   crow.input[2].mode("change", 2.0, .25, "both")
-
-  clock.run(stepXClock)
-  -- clock.run(stepYClock)
   
   grid_redraw()
   redraw()
 end
 
+
 function stepXClock()
-  print(params:get("xClock"), params:get("xClock") == 3)
-  print(params:get("xClockDen")/(params:get("xClockNum")*2))
   while true do
-    advance(1, true)
+    if (params:get("xClock") == 3) then
+      advance(1, true)
+    end
     clock.sync(params:get("xClockDen")/(params:get("xClockNum")*2))
-    advance(1, false)
+    if (params:get("xClock") == 3) then
+      advance(1, false)
+    end
     clock.sync(params:get("xClockDen")/(params:get("xClockNum")*2))
   end
 end
 
--- function stepYClock()
---   -- while true do
---   --   if (params:get("yClock") == 3) then
---   --     advance(2, true)
---   --   end
---   --   clock.sync(params:get("yClockDen")/(params:get("yClockNum")*2))
---   --   if (params:get("yClock") == 3) then
---   --     advance(2, false)
---   --   end
---   --   clock.sync(params:get("yClockDen")/(params:get("yClockNum")*2))
---   -- end
--- end
+function stepYClock()
+  while true do
+    if (params:get("yClock") == 3) then
+      advance(2, true)
+    end
+    clock.sync(params:get("yClockDen")/(params:get("yClockNum")*2))
+    if (params:get("yClock") == 3) then
+      advance(2, false)
+    end
+    clock.sync(params:get("yClockDen")/(params:get("yClockNum")*2))
+  end
+end
 
 
 function advance(inputNum, rising)
@@ -171,8 +186,6 @@ function advance(inputNum, rising)
     stepOut = params:get("yStep")
     gateOut = params:get("yGate")
   end
-
-  --TODO handle case where access is completely blank, prevent infinite loop
   
   -- C
   if rising then
@@ -217,6 +230,9 @@ function advance(inputNum, rising)
     midi_out:note_on(quantizedNotes[3][step[3]], params:get("midiVelC"), params:get("midiChanC"))
     
     -- X and Y
+    if (accessIsBlank(inputNum)) then
+      return
+    end
     stepBase[inputNum] = (stepBase[inputNum]) % 16 + 1
     step[inputNum] = SNAKE_PATTERNS[snake[inputNum]][stepBase[inputNum]]
     while (not access[inputNum][step[inputNum]]) do
@@ -255,6 +271,16 @@ function advance(inputNum, rising)
   end
   grid_redraw()
   redraw()
+end
+
+function accessIsBlank(layer)
+  isBlank = true
+  for i=0,16 do
+    if (access[layer][i]) then
+      isBlank = false
+    end
+  end
+  return isBlank
 end
 
 function redraw()
