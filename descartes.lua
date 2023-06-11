@@ -56,34 +56,37 @@ function initTable(size, value)
 end
 
 function init()
-  params:add_group("x layer",8)
+  params:add_group("x layer",9)
   params:add{type = "option", id = "xClock", name = "clock source", options = {"crow input 1", "crow input 2", "internal clock"}, default = 1}
   params:add{type = "option", id = "xStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=1}
   params:add{type = "option", id = "xGate", name = "gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=2}
   params:add{type = "number", id = "midiChanX", name = "midi channel", min = 1, max = 16, default = 1}
   params:add{type = "number", id = "midiVelX", name = "midi velocity", min = 1, max = 127, default = 100}
+  params:add{type = "number", id = "xMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
   params:add_separator("xClockDiv", "internal clock division")
   params:add{type = "number", id = "xClockNum", name = "numerator", min = 1, max = 8, default = 1}
   params:add{type = "number", id = "xClockDen", name = "denominator", min=1, max=16, default = 1}
 
 
-  params:add_group("y layer",8)
+  params:add_group("y layer",9)
   params:add{type = "option", id = "yClock", name = "clock", options = {"crow input 1", "crow input 2", "internal clock"}, default = 2}
   params:add{type = "option", id = "yStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=3}
   params:add{type = "option", id = "yGate", name = "gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=4}
   params:add{type = "number", id = "midiChanY", name = "midi channel", min = 1, max = 16, default = 2}
   params:add{type = "number", id = "midiVelY", name = "midi velocity", min = 1, max = 127, default = 100}
+  params:add{type = "number", id = "yMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
   params:add_separator("yClockDiv", "internal clock division")
   params:add{type = "number", id = "yClockNum", name = "numerator", min = 1, max = 8, default = 1}
   params:add{type = "number", id = "yClockDen", name = "denominator", min=1, max=16, default = 1}
 
 
-  params:add_group("c layer",4)
+  params:add_group("c layer",5)
   params:add{type = "option", id = "cStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=5}
   params:add{type = "option", id = "cGate", name = "gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=5}
   params:add{type = "number", id = "midiChanC", name = "midi channel", min = 1, max = 16, default = 3}
   params:add{type = "number", id = "midiVelC", name = "midi velocity", min = 1, max = 127, default = 100}
-  
+  params:add{type = "number", id = "cMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
+
   quant = {
     initTable(12, true),
     initTable(12, true),
@@ -227,7 +230,8 @@ function advance(inputNum, rising)
         cGateOpen[inputNum] = true
       end
     end
-    midi_out:note_on(quantizedNotes[3][step[3]], params:get("midiVelC"), params:get("midiChanC"))
+    midiNote = quantizedNotes[3][step[3]] + 24 + getMidiOffset(3)
+    midi_out:note_on(midiNote, params:get("midiVelC"), params:get("midiChanC"))
     
     -- X and Y
     if (accessIsBlank(inputNum)) then
@@ -258,7 +262,9 @@ function advance(inputNum, rising)
         crow.output[gateOut].volts = 5
       end
     end
-    midi_out:note_on(quantizedNotes[inputNum][step[inputNum]], params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+    midiNote = quantizedNotes[inputNum][step[inputNum]] + 24 + getMidiOffset(inputNum)
+    midi_out:note_on(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+
   else
     if gateOut < 5 then
       crow.output[gateOut].volts = 0
@@ -267,7 +273,8 @@ function advance(inputNum, rising)
       crow.output[params:get("cGate")].volts = 0
       cGateOpen[inputNum] = false
     end
-    midi_out:note_off(quantizedNotes[inputNum][step[inputNum]], params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+    midiNote = quantizedNotes[inputNum][step[inputNum]] + 24 + getMidiOffset(inputNum)
+    midi_out:note_off(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
   end
   grid_redraw()
   redraw()
@@ -647,4 +654,15 @@ function loadData()
   params:read(_path.data.."descartes/".."descartes_params.pset")
   redraw()
   grid_redraw()
+end
+
+function getMidiOffset(layer)
+  if (layer == 1) then
+    return params:get("xMidiOffset")
+  elseif (layer == 2) then
+    return params:get("yMidiOffset")
+  elseif (layer == 3) then
+    return params:get("cMidiOffset")
+  end
+  return 0
 end

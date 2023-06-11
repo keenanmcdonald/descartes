@@ -12,6 +12,16 @@ Cartesian sequencer for norns, grid and crow.
 - Go to params to map the various layers' cv and gate outputs to crows four outputs
 
 ## Changelog
+
+### v1.2.0
+- adjusted midi note values so that output midi note numbers match note name displayed
+- added midi offset param in each layer
+
+### v1.1.1
+- fixed a bug in which norns would freeze if a user set turned off all access cells
+- fixed a bug that prevented the y layer from working entirely
+- fixed assignable inputs
+
 ### v1.1.0
 - crow is no longer required!
 - added midi output for all 3 channels, velocity and midi channel configurable in params
@@ -19,8 +29,3 @@ Cartesian sequencer for norns, grid and crow.
 - added param groups
 - fixed a bug in which x clocks weren't cycling correctly in the c layer
 - fixed a bug in which the script may not have been loading due to an absence of save data
-
-### v1.1.1
-- fixed a bug in which norns would freeze if a user set turned off all access cells
-- fixed a bug that prevented the y layer from working entirely
-- fixed assignable inputs
