@@ -49,6 +49,8 @@ local midiVelParam = {"midiVelX", "midiVelY"}
 local midiChanParam = {"midiChanX", "midiChanY"}
 local prevMidiNote = {nil, nil, nil}
 local MIDI_OVERLAP_TIME = 0.01
+local saveDirty = false
+local saveTimerId = nil
 
 function initTable(size, value)
   t = {}
@@ -85,9 +87,8 @@ function connectMidiIn(port)
           noteValue[l][editNote] = util.clamp((closest / maxNote) * 100, 0, 100)
         end
         updateQuantizedNotes(l)
-        grid_redraw()
         redraw()
-        saveData()
+        debouncedSave()
       end
     end
   end
@@ -110,12 +111,12 @@ function init()
   params:add{type = "option", id = "xMidiOverlap", name = "midi glide mode", options = {"off", "overlap", "tie"}, default = 1}
   params:add_separator("xClockDiv", "clock division")
   params:add{type = "number", id = "xClockNum", name = "numerator", min = 1, max = 8, default = 1}
-  params:set_action("xClockNum", function() saveData() end)
+  params:set_action("xClockNum", function() debouncedSave() end)
   params:add{type = "number", id = "xClockDen", name = "denominator", min=1, max=16, default = 1}
-  params:set_action("xClockDen", function() saveData() end)
+  params:set_action("xClockDen", function() debouncedSave() end)
   params:add_separator("xSnakeSep", "snake")
   params:add{type = "number", id = "xSnake", name = "snake pattern", min = 1, max = 16, default = 1}
-  params:set_action("xSnake", function(x) snake[1] = x; saveData(); grid_redraw(); redraw() end)
+  params:set_action("xSnake", function(x) snake[1] = x; debouncedSave(); redraw() end)
 
 
   params:add_group("y layer",13)
@@ -129,12 +130,12 @@ function init()
   params:add{type = "option", id = "yMidiOverlap", name = "midi glide mode", options = {"off", "overlap", "tie"}, default = 1}
   params:add_separator("yClockDiv", "clock division")
   params:add{type = "number", id = "yClockNum", name = "numerator", min = 1, max = 8, default = 1}
-  params:set_action("yClockNum", function() saveData() end)
+  params:set_action("yClockNum", function() debouncedSave() end)
   params:add{type = "number", id = "yClockDen", name = "denominator", min=1, max=16, default = 1}
-  params:set_action("yClockDen", function() saveData() end)
+  params:set_action("yClockDen", function() debouncedSave() end)
   params:add_separator("ySnakeSep", "snake")
   params:add{type = "number", id = "ySnake", name = "snake pattern", min = 1, max = 16, default = 1}
-  params:set_action("ySnake", function(x) snake[2] = x; saveData(); grid_redraw(); redraw() end)
+  params:set_action("ySnake", function(x) snake[2] = x; debouncedSave(); redraw() end)
 
 
   params:add_group("c layer",6)
@@ -219,7 +220,6 @@ function init()
     end
     if params:get("xResetOnStart") == 2 or params:get("yResetOnStart") == 2 then
       step[3] = 1
-      grid_redraw()
       redraw()
     end
   end
@@ -259,7 +259,6 @@ function init()
     end
   end
   
-  grid_redraw()
   redraw()
 end
 
@@ -457,7 +456,6 @@ function advance(inputNum, rising)
       prevMidiNote[3] = nil
     end
   end
-  grid_redraw()
   redraw()
 end
 
@@ -579,12 +577,13 @@ end
 function grid_redraw()
   l = displayLayer
 
-  g:all(0)
-  
+
   -- notes
+  local scaleMax = quantScale[l] and quantScale[l][#quantScale[l]]
   for i=1,16 do
     x, y = toGrid(i)
-    g:led(x, y, math.floor((quantizedNotes[l][i]/quantScale[l][#quantScale[l]])*8))
+    local noteVal = quantizedNotes[l][i]
+    g:led(x, y, scaleMax and noteVal and math.floor((noteVal/scaleMax)*8) or 0)
   end
   
   --active step
@@ -645,9 +644,25 @@ function grid_redraw()
     end
     x,y = toGrid(snake[l], 4,4)
     g:led(x,y,12)
+  else
+    for i=1,16 do
+      x,y=toGrid(i, 4, 4)
+      g:led(x,y,0)
+    end
   end
-  
+  -- x=9-12, y=5-8: unused zone, clear to prevent ghost LEDs
+  for cx = 9, 12 do
+    for cy = 5, 8 do
+      g:led(cx, cy, 0)
+    end
+  end
+
   --layer
+  for lx = 13, 16 do
+    for ly = 5, 8 do
+      g:led(lx, ly, 0)
+    end
+  end
   if l==1 then
     g:led(13,5,12)
     g:led(14,6,12)
@@ -737,10 +752,10 @@ function updateQuantizedNotes(l)
 end
 
 function quantizeValue(value)
+  if #quantScale[l] == 0 then return 0 end
   unQuantizedValue = quantScale[l][#quantScale[l]] * (value / 100)
   leastDiff = 100
   closestNote = nil
-  --TODO: what if there are no notes in the xQuantizer?
   for j=1,#quantScale[l] do
     diff = math.abs(quantScale[l][j] - unQuantizedValue)
     if (diff < leastDiff) then
@@ -761,8 +776,7 @@ function key(n,z)
       displayLayer = displayLayer-1
     end
   end
-  saveData()
-  grid_redraw()
+  debouncedSave()
   redraw()
 end
 
@@ -770,9 +784,9 @@ function enc(n, d)
   l = displayLayer
   if (editNote >= 1) then
     noteValue[l][editNote] = util.clamp(noteValue[l][editNote]+d*2, 0, 100)
+    debouncedSave()
   end
   updateQuantizedNotes(l)
-  grid_redraw()
   redraw()
 end
 
@@ -799,8 +813,7 @@ function g.key(x,y,z)
   else
     editNote = 0
   end
-  saveData()
-  grid_redraw()
+  debouncedSave()
   redraw()
 end
 
@@ -819,6 +832,24 @@ function saveData()
   params:write(_path.data.."descartes/".."descartes_params.pset")
 end
 
+function debouncedSave()
+  saveDirty = true
+  if saveTimerId then clock.cancel(saveTimerId) end
+  saveTimerId = clock.run(function()
+    clock.sleep(1)
+    if saveDirty then
+      saveData()
+      saveDirty = false
+    end
+    saveTimerId = nil
+  end)
+end
+
+function cleanup()
+  if saveTimerId then clock.cancel(saveTimerId) end
+  saveData()
+end
+
 function loadData()
   saveState = tab.load(_path.data.."descartes/".."descartes_state.txt")
   if saveState ~= nil then
@@ -834,7 +865,7 @@ function loadData()
   end
   params:read(_path.data.."descartes/".."descartes_params.pset")
   redraw()
-  grid_redraw()
+
 end
 
 function getMidiOffset(layer)
