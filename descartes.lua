@@ -784,6 +784,7 @@ function enc(n, d)
   l = displayLayer
   if (editNote >= 1) then
     noteValue[l][editNote] = util.clamp(noteValue[l][editNote]+d*2, 0, 100)
+    debouncedSave()
   end
   updateQuantizedNotes(l)
   redraw()
