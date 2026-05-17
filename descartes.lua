@@ -850,22 +850,38 @@ function cleanup()
   saveData()
 end
 
+function isValidTable(v, layers, size)
+  if type(v) ~= 'table' then return false end
+  if #v ~= layers then return false end
+  for i = 1, layers do
+    if type(v[i]) ~= 'table' then return false end
+    if size and #v[i] ~= size then return false end
+  end
+  return true
+end
+
 function loadData()
+  local function tryLoad(key, validator)
+    local s = saveState and saveState[key]
+    if s and validator(s) then return s end
+  end
+
   saveState = tab.load(_path.data.."descartes/".."descartes_state.txt")
-  if saveState ~= nil then
-    quantOctave = saveState['quantOctave']
-    quantScale = saveState['quantScale']
-    quantizedNotes = saveState['quantizedNotes']
-    snake = saveState['snake']
-    quant =  saveState['quant']
-    access = saveState['access']
-    noteValue = saveState['noteValue']
-    gate = saveState['gate']
-    glide = saveState['glide']
+
+  if saveState then
+    quantOctave    = tryLoad('quantOctave',    function(s) return type(s)=='table' and #s==3 end) or quantOctave
+    snake          = tryLoad('snake',          function(s) return type(s)=='table' and #s==2 end) or snake
+    quant          = tryLoad('quant',          function(s) return isValidTable(s, 3, 12) end) or quant
+    access         = tryLoad('access',         function(s) return isValidTable(s, 3, 16) end) or access
+    noteValue      = tryLoad('noteValue',      function(s) return isValidTable(s, 3, 16) end) or noteValue
+    quantizedNotes = tryLoad('quantizedNotes', function(s) return isValidTable(s, 3, 16) end) or quantizedNotes
+    gate           = tryLoad('gate',           function(s) return isValidTable(s, 3, 16) end) or gate
+    glide          = tryLoad('glide',          function(s) return isValidTable(s, 3, 16) end) or glide
+    -- always rebuild quantScale from quant + quantOctave to ensure consistency
+    for i=1,3 do l=i; updateQuantScale(i) end
   end
   params:read(_path.data.."descartes/".."descartes_params.pset")
   redraw()
-
 end
 
 function getMidiOffset(layer)
