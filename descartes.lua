@@ -860,6 +860,37 @@ function isValidTable(v, layers, size)
   return true
 end
 
+-- Validate that all elements in a flat array are numbers within [lo, hi]
+local function isValidNumArray(v, len, lo, hi)
+  if type(v) ~= 'table' or #v ~= len then return false end
+  for i = 1, len do
+    if type(v[i]) ~= 'number' or v[i] < lo or v[i] > hi then return false end
+  end
+  return true
+end
+
+-- Validate a 2D table where each sub-array has numeric elements in [lo, hi]
+local function isValidNumTable(v, layers, size, lo, hi)
+  if not isValidTable(v, layers, size) then return false end
+  for i = 1, layers do
+    for j = 1, #v[i] do
+      if type(v[i][j]) ~= 'number' or v[i][j] < lo or v[i][j] > hi then return false end
+    end
+  end
+  return true
+end
+
+-- Validate a 2D table where each sub-array has boolean elements
+local function isValidBoolTable(v, layers, size)
+  if not isValidTable(v, layers, size) then return false end
+  for i = 1, layers do
+    for j = 1, #v[i] do
+      if type(v[i][j]) ~= 'boolean' then return false end
+    end
+  end
+  return true
+end
+
 function loadData()
   local function tryLoad(key, validator)
     local s = saveState and saveState[key]
@@ -869,14 +900,13 @@ function loadData()
   saveState = tab.load(_path.data.."descartes/".."descartes_state.txt")
 
   if saveState then
-    quantOctave    = tryLoad('quantOctave',    function(s) return type(s)=='table' and #s==3 end) or quantOctave
-    snake          = tryLoad('snake',          function(s) return type(s)=='table' and #s==2 end) or snake
-    quant          = tryLoad('quant',          function(s) return isValidTable(s, 3, 12) end) or quant
-    access         = tryLoad('access',         function(s) return isValidTable(s, 3, 16) end) or access
-    noteValue      = tryLoad('noteValue',      function(s) return isValidTable(s, 3, 16) end) or noteValue
-    quantizedNotes = tryLoad('quantizedNotes', function(s) return isValidTable(s, 3, 16) end) or quantizedNotes
-    gate           = tryLoad('gate',           function(s) return isValidTable(s, 3, 16) end) or gate
-    glide          = tryLoad('glide',          function(s) return isValidTable(s, 3, 16) end) or glide
+    quantOctave    = tryLoad('quantOctave',    function(s) return isValidNumArray(s, 3, 1, 16) end) or quantOctave
+    snake          = tryLoad('snake',          function(s) return isValidNumArray(s, 2, 1, 16) end) or snake
+    quant          = tryLoad('quant',          function(s) return isValidBoolTable(s, 3, 12) end) or quant
+    access         = tryLoad('access',         function(s) return isValidBoolTable(s, 3, 16) end) or access
+    noteValue      = tryLoad('noteValue',      function(s) return isValidNumTable(s, 3, 16, 0, 100) end) or noteValue
+    gate           = tryLoad('gate',           function(s) return isValidBoolTable(s, 3, 16) end) or gate
+    glide          = tryLoad('glide',          function(s) return isValidBoolTable(s, 3, 16) end) or glide
     -- always rebuild quantScale from quant + quantOctave to ensure consistency
     for i=1,3 do l=i; updateQuantScale(i) end
   end
